@@ -140,9 +140,19 @@ namespace WindowsFormsApp1
 
         class TriDiagonaMatrixElement
         {
-            public double a;
-            public double b;
-            public double c;
+            // |c b 0 0|
+            // |a c b 0|
+            // |0 a c b|
+            // |0 0 a c|
+            public double a; // Элементы под главной диагональю
+            public double b; // Элементы над главной диагональю
+            public double c; // Элементы на главной диагонали
+            public TriDiagonaMatrixElement()
+            {
+                a = 0;
+                b = 0;
+                c = 0;
+            }
         }
 
         class TriDiagonalMatrix
@@ -151,15 +161,49 @@ namespace WindowsFormsApp1
             public TriDiagonalMatrix(int n)
             {
                 elements = new TriDiagonaMatrixElement[n];
+                for (int i = 0; i < n; i++)
+                {
+                    elements[i] = new TriDiagonaMatrixElement();
+                }
             }
-            public TriDiagonaMatrixElement this [int i] {
+            public TriDiagonaMatrixElement this[int i]
+            {
                 get => elements[i];
             }
 
             public int Length
             {
                 get => elements.Length;
-            } 
+            }
+
+            // Решение методом прогонки
+            public double[] solve(double[] F)
+            {
+                // Размер матрицы должен совпадать
+                // с размером вектора свободных коэффициентов
+                if (F.Length != elements.Length)
+                    throw new IndexOutOfRangeException();
+
+                double[] x = new double[F.Length];
+                double[] alpha = new double[F.Length];
+                double[] beta = new double[F.Length];
+                alpha[1] = -elements[0].b / elements[0].c;
+                beta[1] = F[0] / elements[0].c;
+                for (int i = 1; i < F.Length - 1; i++)
+                {
+                    double t = elements[i].a * alpha[i] + elements[i].c;
+                    alpha[i + 1] = -elements[i].b / t;
+                    beta[i + 1] = (F[i] - elements[i].a * beta[i]) / t;
+                }
+
+                int N = x.Length - 1;
+                x[N] = (F[N] - elements[N].a * beta[N]) / (elements[N].c + elements[N].a * alpha[N]);
+                for (int i = N - 1; i >= 0; i--)
+                {
+                    x[i] = alpha[i + 1] * x[i + 1] + beta[i + 1];
+                }
+                return x;
+            }
         }
 
         public class CubicSpline
@@ -167,7 +211,7 @@ namespace WindowsFormsApp1
             private double start;
             private double end;
             private Tuple<double, double>[] ranges;
-            private Point [] points;
+            private Point[] points;
             private Polinom[] splines;
             public CubicSpline(Point[] inputPoints)
             {
@@ -176,58 +220,41 @@ namespace WindowsFormsApp1
                 double[] h = new double[points.Length];
                 for (int i = 1; i < points.Length; i++)
                 {
-                    h[i] = points[i].getX() - points[i-1].getX();
+                    h[i] = points[i].getX() - points[i - 1].getX();
                 }
 
-                int N = ranges.Length;
-                TriDiagonalMatrix matrix = new TriDiagonalMatrix(N);
-                double[] F = new double[N];
+                TriDiagonalMatrix matrix = new TriDiagonalMatrix(points.Length - 2);
+                double[] F = new double[points.Length - 2];
                 // Построение системы динейных уравнений относительно coeff_c[i],  коэффициент при x^2
-                
+
+                for (int i = 2; i < points.Length; i++)
+                {
+                    matrix[i - 2].a = h[i - 1];
+                    matrix[i - 2].c = 2 * (h[i] + h[i - 1]);
+                    matrix[i - 2].b = h[i];
+                    F[i - 2] = 3 * ((points[i].getY() - points[i - 1].getY()) / h[i] -
+                        (points[i - 1].getY() - points[i - 2].getY()) / h[i - 1]);
+                }
                 matrix[0].a = 0;
-                matrix[0].b = h[1];
-                matrix[0].c = 2 * (h[0] + h[1]);
+                matrix[matrix.Length - 1].b = 0;
 
-                matrix[N - 1].a = h[N - 2];
-                matrix[N - 1].b = 0;
-                matrix[N-1].c = 2 * (h[N-2] + h[N-1]);
+                // Находим коэффициенты 'с'
+                double[] c = new double[points.Length + 1];
+                c[0] = 0;
+                double[] t = matrix.solve(F);
+                Array.Copy(t, 0, c, 1, t.Length);
+                c[c.Length - 1] = 0;
 
-                for (int i = 1; i < N - 1; i++)
-                {
-                    matrix[i].a = h[i];
-                    matrix[i].c = 2 * (h[i] + h[i + 1]);
-                    matrix[i].b = h[i + 1];
-                    F[i] = 3 * ((points[i + 1].getY() - points[i].getY()) / h[i + 1] -
-                        (points[i].getY() - points[i - 1].getY()) / h[i]);
-                }
 
-                // Решение методом прогонки, находим coeff_c[i]
 
-                double[] alpha = new double[points.Length];
-                double[] beta = new double[points.Length];
-                double[] x = new double[points.Length];
-                alpha[1] = -B[0] / C[0];
-                beta[1] = F[0] / C[0];
-                for (int i = 1; i < points.Length-1; i++)
-                {
-                    double t = A[i - 1] * alpha[i - 1] + C[i - 1];
-                    alpha[i] = B[i - 1] / t;
-                    beta[i] = (F[i - 1] - A[i - 1] * B[i - 1]) / t;
-                }
-
-                coeff_c[coeff_c]
-                for (int i = points.Length - 2; i >= 0; i--)
-                {
-                    coeff_c[i] = alpha[i + 1] * x[i + 1] + beta[i + 1];
-                }
 
                 // Вычисляем оставшмеся коэффициетны и создаем сплайны
-                for (int i = 1; i < points.Length-1; i++)
+                for (int i = 1; i < c.Length - 1; i++)
                 {
-                    double a = points[i].getX(); // свободный коэффициент
-                    double d = coeff_c[i] - coeff_c[i - 1]; // коэффициент при x^3
-                    double b = (points[i].getX() - points[i - 1].getX()) / h[i] + (2 * coeff_c[i] + coeff_c[i - 1]) / 3; // коэффициент при x^1
-                    splines[i] = new Polinom(new double[] { a, b, coeff_c[i], d });
+                    double a = points[i - 1].getY(); // свободный коэффициент
+                    double d = (c[i + 1] - c[i]) / (3 * h[i]); // коэффициент при x^3
+                    double b = (points[i].getY() - points[i - 1].getY()) / h[i] - (2 * c[i] + c[i + 1]) * h[i] / 3; // коэффициент при x^1
+                    splines[i - 1] = new Polinom(new double[] { a, b, c[i], d });
                 }
             }
 
@@ -253,13 +280,13 @@ namespace WindowsFormsApp1
                 }
 
                 // Преобразуем словарь в список и сортируем по убыванию X
-                List<Point> sorted = dict.Select(x => new Point(x.Key, x.Value)).ToList();
-                sorted.Sort((a, b) => a.getX().CompareTo(b.getY()));
+                List<Point> sorted = dict.Select(x => new Point(x.Key, x.Value)).OrderBy(p => p.getX()).ToList();
+                //sorted.OrderBy(p=>p.getX()).Sort((a, b) => a.getX().CompareTo(b.getY()));
 
                 // Преобразуем список в массив и строим интервалы
                 points = sorted.ToArray();
                 ranges = new Tuple<double, double>[points.Length - 1];
-                for (int i = 0; i < points.Length-1; i++)
+                for (int i = 0; i < points.Length - 1; i++)
                 {
                     ranges[i] = new Tuple<double, double>(points[i].getX(), points[i + 1].getX());
                 }
@@ -268,11 +295,11 @@ namespace WindowsFormsApp1
                 end = points[points.Length - 1].getX();
             }
 
-            int findRange(double point)
+            int findRange(double X)
             {
                 for (int i = 0; i < ranges.Length; i++)
                 {
-                    if (point >= ranges[i].Item1 && point <= ranges[i].Item1)
+                    if (X >= ranges[i].Item1 && X <= ranges[i].Item2)
                         return i;
                 }
                 return -1;
@@ -281,14 +308,19 @@ namespace WindowsFormsApp1
             public Point[] getPoints(int numberOfPoints = 100)
             {
                 double step = (end - start) / numberOfPoints;
-                Point[] res = new Point[numberOfPoints]; 
+                Point[] res = new Point[numberOfPoints];
                 for (int i = 0; i < numberOfPoints; i++)
                 {
                     double x = start + i * step;
                     if (i == numberOfPoints - 1)
                         x = end;
                     int iRange = findRange(x);
-                    double y = splines[iRange].f(x - ranges[i].Item1);
+                    if (splines[iRange] == null)
+                    {
+                        res[i] = new Point(x, 1);
+                        continue;
+                    }
+                    double y = splines[iRange].f(x - ranges[iRange].Item1);
                     res[i] = new Point(x, y);
                 }
                 return res;
