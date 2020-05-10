@@ -241,8 +241,9 @@ namespace WindowsFormsApp1
                 // Находим коэффициенты 'с'
                 double[] c = new double[points.Length + 1];
                 c[0] = 0;
+                c[1] = 0;
                 double[] t = matrix.solve(F);
-                Array.Copy(t, 0, c, 1, t.Length);
+                Array.Copy(t, 0, c, 2, t.Length);
                 c[c.Length - 1] = 0;
 
 
